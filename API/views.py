@@ -1,8 +1,9 @@
-from os import stat
+from operator import truediv
+from rest_framework.authtoken.models import Token
+from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from django.contrib.auth.decorators import login_required
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -10,9 +11,12 @@ from .models import User
 from .serializer import ChangePasswordSerializer, LoginSerializer, UserSerializer
 from django.contrib.auth import login, logout
 from rest_auth.serializers import LoginSerializer
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.encoding import force_bytes, force_text
+from django.contrib.sites.shortcuts import get_current_site
 
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
 def all_users(request):
   if(request.method == "GET"):
     if(request.user.is_superuser):
@@ -29,16 +33,24 @@ def all_users(request):
     else:
       return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_404_NOT_FOUND)
 
-  if not request.user.is_authenticated:
-    if request.method == "POST" :
-      serializer = UserSerializer(data=request.data)
-      if serializer.is_valid():
-        serializer.save(is_active=False, password= make_password(serializer.validated_data['password']))
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-      return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-  else :
-    return Response({"detail": "Can't Add another user."}, status=status.HTTP_400_BAD_REQUEST)
-
+  if request.method == "POST" :
+    serializer = UserSerializer(data=request.data)
+    if serializer.is_valid():
+      serializer.save(is_active=False, password= make_password(serializer.validated_data['password']))
+      user = User.objects.get(email= serializer.validated_data['email'])
+      token = str(Token.objects.get(user=user))
+      uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
+      site = str(get_current_site(request))
+      send_mail(
+        subject="A new user found!!",
+        message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you.\
+        Confirmation Link : http://" + site +"/activate/"+uidb64+"/"+token,
+        from_email="test@gmail.com",
+        recipient_list=[serializer.validated_data['email']]
+      )
+      # activate_account(request._request, serializer.validated_data["email"])
+      return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', "DELETE", "PUT"])
@@ -70,9 +82,8 @@ def get_user_detail(request, pk):
 
 @api_view(["POST"])
 def login_user(request):
-  serializer = LoginSerializer(data=request.data)
+  serializer = LoginSerializer(data=request.data,context={'request': request})
   if serializer.is_valid():
-    print("pass")
     try:
       user = User.objects.get(username=serializer.validated_data['username'])
     except:
@@ -105,3 +116,44 @@ def change_password(request):
     user.password = make_password(serializer.validated_data["new_password"])
     user.save()
   return Response({"success":"Password Changed Successfully"})
+
+
+def activate_account(req, email):
+  try:
+    user = User.objects.get(email= "pchandra1002@gmail.com")
+  except:
+    return
+  token = str(Token.objects.get(user=user))
+  uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
+  site = str(get_current_site(req))
+  print(req)
+  send_mail(
+    subject="A new user found!!",
+    message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you.\
+    Confirmation Link : http://" + site +"/activate/"+uidb64+"/"+token+"/",
+    from_email="test@gmail.com",
+    recipient_list=[email]
+  )
+
+@api_view(["GET"])
+def activate_account(request, uidb64, token):
+  uid = force_text(urlsafe_base64_decode(uidb64))
+  try:
+    user= User.objects.get(pk=uid)
+  except:
+    return Response({"error":"There is some issue to activate you account!!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+  if user is not None:
+    user.is_active = True
+    user.save()
+    return Response({"success":"Your account has been activates successfully!","message":"Thanks for joining us!"}, status=status.HTTP_200_OK)
+  else :
+    return Response({"error":"There is some issue with the account!"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+  
+
+
+
+
+
+
