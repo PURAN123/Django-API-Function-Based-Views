@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from .models import User
-from .serializer import ChangePasswordSerializer, LoginSerializer, UserSerializer
+from .serializer import ChangePasswordSerializer, LoginSerializer, ResetNewPasswordSerializer, ResetPasswordSerializer, UserSerializer
 from django.contrib.auth import login, logout
 from rest_auth.serializers import LoginSerializer
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -46,7 +46,8 @@ def all_users(request):
         message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you.\
         Confirmation Link : http://" + site +"/activate/"+uidb64+"/"+token,
         from_email="test@gmail.com",
-        recipient_list=[serializer.validated_data['email']]
+        recipient_list=[user.email],
+        fail_silently=True
       )
       # activate_account(request._request, serializer.validated_data["email"])
       return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -118,23 +119,6 @@ def change_password(request):
   return Response({"success":"Password Changed Successfully"})
 
 
-def activate_account(req, email):
-  try:
-    user = User.objects.get(email= "pchandra1002@gmail.com")
-  except:
-    return
-  token = str(Token.objects.get(user=user))
-  uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
-  site = str(get_current_site(req))
-  print(req)
-  send_mail(
-    subject="A new user found!!",
-    message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you.\
-    Confirmation Link : http://" + site +"/activate/"+uidb64+"/"+token+"/",
-    from_email="test@gmail.com",
-    recipient_list=[email]
-  )
-
 @api_view(["GET"])
 def activate_account(request, uidb64, token):
   uid = force_text(urlsafe_base64_decode(uidb64))
@@ -149,11 +133,60 @@ def activate_account(request, uidb64, token):
   else :
     return Response({"error":"There is some issue with the account!"}, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(["POST"])
+def reset_password(request):
+  serializer = ResetPasswordSerializer(data = request.data)
+  if serializer.is_valid():
+    try:
+      user = User.objects.get(email = serializer.validated_data["email"])
+    except :
+      return Response({"error":"No user found with this email address!"}, status=status.HTTP_404_NOT_FOUND)
+    if user is not None:
+      token = str(Token.objects.get(user=user))
+      uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
+      site = str(get_current_site(request))
+      send_mail (
+        subject="A new user found!!",
+        message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you.\
+        Confirmation Link : http://" + site +"/reset/"+uidb64+"/"+token,
+        from_email="test@gmail.com",
+        recipient_list=[user.email],
+        fail_silently=True
+      )
+      return Response({"details":"Please check you email to reset your password!"})
+  return Response({"error":"please enter a valid data!"})
 
-  
+@api_view(["POST"])
+def create_password(request, uidb64, token):
+  serializer = ResetNewPasswordSerializer(data= request.data)
+  if serializer.is_valid():
+    uid = force_text(urlsafe_base64_decode(uidb64))
+    try:
+      user= User.objects.get(pk=uid)
+    except:
+      return Response({"error":"User not found!!"}, status=status.HTTP_404_NOT_FOUND)
+    if user is not None:
+      if(serializer.validated_data["new_password"]!= serializer.validated_data["confirm_password"]):
+        return Response({"error":"Confirm password not same as new password"},status=status.HTTP_400_BAD_REQUEST)
+      user.password = make_password(serializer.validated_data["new_password"])
+      user.save()
+      return Response({"success":"Your password reset successfully!"}, status=status.HTTP_200_OK)
+  return Response({"error":"Anter valid data!"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
-
-
-
+# def activate_account(req, email):
+#   try:
+#     user = User.objects.get(email= "pchandra1002@gmail.com")
+#   except:
+#     return
+#   token = str(Token.objects.get(user=user))
+#   uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
+#   site = str(get_current_site(req))
+#   print(req)
+#   send_mail(
+#     subject="A new user found!!",
+#     message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you. Confirmation Link : http://" + site +"/activate/"+uidb64+"/"+token+"/",
+#     from_email="test@gmail.com",
+#     recipient_list=[email]
+#   )

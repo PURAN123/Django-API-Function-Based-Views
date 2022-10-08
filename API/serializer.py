@@ -1,3 +1,4 @@
+
 from rest_framework import serializers
 from .models import User
 
@@ -19,3 +20,11 @@ class ChangePasswordSerializer(serializers.Serializer):
   old_password = serializers.CharField()
   new_password = serializers.CharField()
   confirm_password = serializers.CharField()#style={'input_type': 'password'}
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+  email = serializers.EmailField();
+
+class ResetNewPasswordSerializer(serializers.Serializer):
+  new_password = serializers.CharField()
+  confirm_password = serializers.CharField()
