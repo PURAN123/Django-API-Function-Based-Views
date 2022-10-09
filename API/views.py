@@ -1,62 +1,76 @@
-from operator import truediv
-from rest_framework.authtoken.models import Token
-from django.core.mail import send_mail
-from django.contrib.auth.hashers import make_password
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.response import Response
-from .models import User
-from .serializer import ChangePasswordSerializer, LoginSerializer, ResetNewPasswordSerializer, ResetPasswordSerializer, UserSerializer
 from django.contrib.auth import login, logout
-from rest_auth.serializers import LoginSerializer
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from django.utils.encoding import force_bytes, force_text
+from django.contrib.auth.hashers import make_password
 from django.contrib.sites.shortcuts import get_current_site
+from django.core.mail import send_mail
+from django.utils.encoding import force_bytes, force_text
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from rest_auth.serializers import LoginSerializer
+from rest_framework import status
+from rest_framework.reverse import reverse
+from rest_framework.authtoken.models import Token
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
-@api_view(["GET", "POST"])
-# @permission_classes([IsAuthenticated])
+from .models import User
+from .serializer import (ChangePasswordSerializer, LoginSerializer,
+                         ResetNewPasswordSerializer, ResetPasswordSerializer,
+                         UserSerializer)
+
+
+@api_view(["GET"])
+def api_root(request):
+  return Response({
+    "users":reverse("users", request=request),
+    "create_user": reverse("create_user", request=request)
+  })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def all_users(request):
-  if(request.method == "GET"):
-    if(request.user.is_superuser):
-      user = User.objects.all()
-      page = PageNumberPagination()
-      page.page_size = 3
-      result_page = page.paginate_queryset(user, request)
-      serializer = UserSerializer(result_page, many= True)
-      return page.get_paginated_response(serializer.data)
-    if(request.user.is_authenticated):
-      user = User.objects.get(pk=request.user.id)
-      serializer = UserSerializer(user)
-      return Response(serializer.data,status=status.HTTP_200_OK)
-    else:
-      return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_404_NOT_FOUND)
+  """
+  Access individual user data. If you are super user then you can
+  access all user data. If you are active user then youcan view or update only
+  your own data.
+  """
+  if(request.user.is_superuser):
+    user = User.objects.all()
+    page = PageNumberPagination()
+    page.page_size = 3
+    result_page = page.paginate_queryset(user, request)
+    serializer = UserSerializer(result_page, many= True)
+    return page.get_paginated_response(serializer.data)
+  if(request.user.is_authenticated):
+    user = User.objects.get(pk=request.user.id)
+    serializer = UserSerializer(user)
+    return Response(serializer.data,status=status.HTTP_200_OK)
+  else:
+    return Response({"details": "Authentication credentials were not provided."}, status=status.HTTP_404_NOT_FOUND)
 
-  if request.method == "POST" :
-    serializer = UserSerializer(data=request.data)
-    if serializer.is_valid():
-      serializer.save(is_active=False, password= make_password(serializer.validated_data['password']))
-      user = User.objects.get(email= serializer.validated_data['email'])
-      token = str(Token.objects.get(user=user))
-      uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
-      site = str(get_current_site(request))
-      send_mail(
-        subject="A new user found!!",
-        message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you.\
-        Confirmation Link : http://" + site +"/activate/"+uidb64+"/"+token,
-        from_email="test@gmail.com",
-        recipient_list=[user.email],
-        fail_silently=True
-      )
-      # activate_account(request._request, serializer.validated_data["email"])
-      return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["POST"])
+def create_user(request):
+  """
+  Create user for you organisation
+  """
+  serializer = UserSerializer(data=request.data)
+  if serializer.is_valid():
+    serializer.save(is_active=False, password= make_password(serializer.validated_data['password']))
+    send_activate_email(request, serializer.validated_data["email"])
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+  return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', "DELETE", "PUT"])
 @permission_classes([IsAuthenticated])
 def get_user_detail(request, pk):
+  """
+  Access individual user data. If you are super user then you can
+  access every user data. If you are active user then you can view or update only
+  your own data.
+  """
   try:
     user= User.objects.get(pk=pk)
   except:
@@ -81,8 +95,13 @@ def get_user_detail(request, pk):
   else :
     return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_404_NOT_FOUND)
 
+
 @api_view(["POST"])
 def login_user(request):
+  """
+  Login Here to access you data or if you are a superuser
+  then you can see all user data.
+  """
   serializer = LoginSerializer(data=request.data,context={'request': request})
   if serializer.is_valid():
     try:
@@ -95,15 +114,23 @@ def login_user(request):
     return Response(serializer.data,status=status.HTTP_200_OK)
   return Response({"details":"Enter a valid data"}, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_user(request):
+  """
+  Logout user if user is logged in 
+  """
   logout(request)
   return Response({"success":"Logout successfully"},status=status.HTTP_200_OK)
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def change_password(request):
+  """
+  Change password with your old password and create new password.
+  """
   serializer = ChangePasswordSerializer(data=request.data)
   if(serializer.is_valid()):
     try:
@@ -121,6 +148,9 @@ def change_password(request):
 
 @api_view(["GET"])
 def activate_account(request, uidb64, token):
+  """
+  Working of activate account 
+  """
   uid = force_text(urlsafe_base64_decode(uidb64))
   try:
     user= User.objects.get(pk=uid)
@@ -133,8 +163,13 @@ def activate_account(request, uidb64, token):
   else :
     return Response({"error":"There is some issue with the account!"}, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(["POST"])
 def reset_password(request):
+  """
+  If you forgot you account password then you easily create new password
+  using your email address.
+  """
   serializer = ResetPasswordSerializer(data = request.data)
   if serializer.is_valid():
     try:
@@ -156,8 +191,12 @@ def reset_password(request):
       return Response({"details":"Please check you email to reset your password!"})
   return Response({"error":"please enter a valid data!"})
 
+
 @api_view(["POST"])
 def create_password(request, uidb64, token):
+  """
+  Create a new password if you forgot your password.
+  """
   serializer = ResetNewPasswordSerializer(data= request.data)
   if serializer.is_valid():
     uid = force_text(urlsafe_base64_decode(uidb64))
@@ -174,19 +213,21 @@ def create_password(request, uidb64, token):
   return Response({"error":"Anter valid data!"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-
-# def activate_account(req, email):
-#   try:
-#     user = User.objects.get(email= "pchandra1002@gmail.com")
-#   except:
-#     return
-#   token = str(Token.objects.get(user=user))
-#   uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
-#   site = str(get_current_site(req))
-#   print(req)
-#   send_mail(
-#     subject="A new user found!!",
-#     message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you. Confirmation Link : http://" + site +"/activate/"+uidb64+"/"+token+"/",
-#     from_email="test@gmail.com",
-#     recipient_list=[email]
-#   )
+def send_activate_email(req, email):
+  """
+  Send user an email to activate his account
+  As well as user will click on the link it will activate its account.
+  """
+  try:
+    user = User.objects.get(email= email)
+  except:
+    return
+  token, _ = Token.objects.get_or_create(user=user)
+  uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
+  site = str(get_current_site(req))
+  send_mail(
+    subject="A new user found!!",
+    message="Hii"+ user.username+", Hope you are doing well. To activate your account please check your mail and click on the link sent to you. Confirmation Link : http://" + site +"/activate/"+uidb64+"/"+str(token)+"/",
+    from_email="test@gmail.com",
+    recipient_list=[email]
+  )
