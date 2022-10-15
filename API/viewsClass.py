@@ -1,4 +1,4 @@
-from requests import Response
+
 from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
@@ -7,6 +7,9 @@ from .serializer import UserSerializer
 from .models import User
 
 class UsersList(generics.ListAPIView):
+  permission_classes = [IsAuthenticated]
+  # queryset = User.objects.all()
+  serializer_class = UserSerializer
 
   def get_queryset(self):
     if self.request.user.is_superuser:
@@ -14,10 +17,10 @@ class UsersList(generics.ListAPIView):
     elif self.request.user.is_authenticated:
       return User.objects.get(id = self.request.user.id)
 
-  def get_serializer(self, *args, **kwargs):
-    return UserSerializer
+  # def get_serializer(self, *args, **kwargs):
+  #   return UserSerializer
 
   def list(self, request, *args, **kwargs):
     query_set = self.get_queryset()
-    serializer = self.get_serializer(query_set, many=True)
+    serializer = UserSerializer(query_set, many=True)
     return Response(serializer.data)

@@ -13,7 +13,10 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from django.utils.http import base36_to_int, int_to_base36
+
 from .models import User
+from .tokens import generate_token
 from .serializer import (ChangePasswordSerializer, LoginSerializer,
                          ResetNewPasswordSerializer, ResetPasswordSerializer,
                          UserSerializer)
@@ -59,6 +62,7 @@ def create_user(request):
   if serializer.is_valid():
     serializer.save(is_active=False, password= make_password(serializer.validated_data['password']))
     send_activate_email(request, serializer.validated_data["email"])
+
     return Response(serializer.data, status=status.HTTP_201_CREATED)
   return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -156,7 +160,7 @@ def activate_account(request, uidb64, token):
     user= User.objects.get(pk=uid)
   except:
     return Response({"error":"There is some issue to activate you account!!"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-  if user is not None:
+  if user is not None and generate_token.check_token(user, token):
     user.is_active = True
     user.save()
     return Response({"success":"Your account has been activates successfully!","message":"Thanks for joining us!"}, status=status.HTTP_200_OK)
@@ -177,7 +181,7 @@ def reset_password(request):
     except :
       return Response({"error":"No user found with this email address!"}, status=status.HTTP_404_NOT_FOUND)
     if user is not None:
-      token = str(Token.objects.get(user=user))
+      token = generate_token.make_token(user)
       uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
       site = str(get_current_site(request))
       send_mail (
@@ -204,13 +208,13 @@ def create_password(request, uidb64, token):
       user= User.objects.get(pk=uid)
     except:
       return Response({"error":"User not found!!"}, status=status.HTTP_404_NOT_FOUND)
-    if user is not None:
+    if user is not None and generate_token.check_token(user,token):
       if(serializer.validated_data["new_password"]!= serializer.validated_data["confirm_password"]):
         return Response({"error":"Confirm password not same as new password"},status=status.HTTP_400_BAD_REQUEST)
       user.password = make_password(serializer.validated_data["new_password"])
       user.save()
       return Response({"success":"Your password reset successfully!"}, status=status.HTTP_200_OK)
-  return Response({"error":"Anter valid data!"}, status=status.HTTP_400_BAD_REQUEST)
+  return Response({"error":"Enter valid data!"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def send_activate_email(req, email):
@@ -222,7 +226,7 @@ def send_activate_email(req, email):
     user = User.objects.get(email= email)
   except:
     return
-  token, _ = Token.objects.get_or_create(user=user)
+  token = generate_token.make_token(user)
   uidb64 = str(urlsafe_base64_encode(force_bytes(user.id)))
   site = str(get_current_site(req))
   send_mail(
