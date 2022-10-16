@@ -1,4 +1,5 @@
 # Django-Rest-API
+The api views are totally function based views.
 This is a complete Django Rest Framework with lots of the permissions and access permissions. A complete setup of a program with API.
 
 # Access Permissions
