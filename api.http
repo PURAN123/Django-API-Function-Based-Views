@@ -1,0 +1,22 @@
+GET http://127.0.0.1:8000/api/v2/users/9/
+
+
+
+
+POST http://127.0.0.1:8000/api/v2/users/9/
+Content-Type: application/json
+
+{
+  "username": "test5",
+  "first_name": "test5",
+  "last_name": "test",
+  "email": "test5@gmail.com",
+  "phone": 78945612125,
+  "dob": "2022-10-09",
+  "zipcode": 263153,
+  "street": "Indra Colony",
+  "city": "Mohali",
+  "state": "UK",
+  "country": "India",
+  "password":"password"
+}

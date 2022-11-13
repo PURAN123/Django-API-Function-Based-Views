@@ -6,26 +6,23 @@ from django.utils.encoding import force_bytes, force_text
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_auth.serializers import LoginSerializer
 from rest_framework import status
-from rest_framework.reverse import reverse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
-from django.utils.http import base36_to_int, int_to_base36
+from rest_framework.reverse import reverse
 
 from .models import User
-from .tokens import generate_token
 from .serializer import (ChangePasswordSerializer, LoginSerializer,
                          ResetNewPasswordSerializer, ResetPasswordSerializer,
                          UserSerializer)
-
+from .tokens import generate_token
 
 @api_view(["GET"])
 def api_root(request):
   return Response({
     "users":reverse("users", request=request),
-    "create_user": reverse("create_user", request=request)
+    "create_user": reverse("create_user", request=request),
   })
 
 
