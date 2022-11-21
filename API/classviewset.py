@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from .serializer import UserSerializer
 from .models import User
 from django.contrib.auth.hashers import make_password
+from rest_framework.permissions import IsAuthenticated
 
 
 class UserModelViewset(viewsets.ModelViewSet):
@@ -14,6 +15,7 @@ class UserModelViewset(viewsets.ModelViewSet):
 
 
 class UserViewset(viewsets.ViewSet):
+  permission_classes = [IsAuthenticated]
   def list(self, request):
     queryset = User.objects.all()
     serializer = UserSerializer(queryset, many=True)

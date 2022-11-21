@@ -1,0 +1,9 @@
+
+GET http://127.0.0.1:8000/api/v2/users/10/
+Authorization: 247891faa07897a3bb22c3c596eb9ca95ab3e95d
+
+
+###
+
+GET http://127.0.0.1:8000/api/v2/all_users/
+
