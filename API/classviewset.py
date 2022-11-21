@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from rest_framework import status
+from rest_framework import status, generics, mixins
 from rest_framework.response import Response
 from .serializer import UserSerializer
 from .models import User
@@ -66,4 +66,25 @@ class UserViewset(viewsets.ViewSet):
       return Response({"error":"User does not exists!"}, status= status.HTTP_404_NOT_FOUND)
     queryset.delete()
     return Response({"details":"user deleted successfully!"}, status=status.HTTP_204_NO_CONTENT)
+
+
+
+class UserGenericListView(generics.ListAPIView):
+  # permission_classes = [IsAuthenticated,]
+  # queryset = User.objects.all()
+  # serializer_class = UserSerializer
+  # lookup_field= "id"
+
+  def list(self, request, *args, **kwargs):
+    if(self.request.user.is_superuser):
+      users = User.objects.all()
+
+    elif self.request.user.is_authenticated:
+      users =  User.objects.get(id= self.request.user.id)
+    
+    serialiser = UserSerializer(users, many=True)
+    if serialiser.is_valid():
+      return Response(serialiser.data)
+    return Response(serialiser.errors)
+
 
