@@ -9,8 +9,7 @@ router.register("users", UserViewset, basename="users")
 router.register("all_users", UserModelViewset, basename="all_users" )
 urlpatterns = [
   path("", include(router.urls)),
-  path("gen_users/", UserGenericListView.as_view({'get':'list'}), name= "gen_users"),
-  
+  path("gen_users/", UserGenericListView.as_view(), name= "gen_users"),
 ]
 
 

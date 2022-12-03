@@ -15,7 +15,7 @@ class UserModelViewset(viewsets.ModelViewSet):
 
 
 class UserViewset(viewsets.ViewSet):
-  permission_classes = [IsAuthenticated]
+  # permission_classes = [IsAuthenticated]
   def list(self, request):
     queryset = User.objects.all()
     serializer = UserSerializer(queryset, many=True)
@@ -69,22 +69,26 @@ class UserViewset(viewsets.ViewSet):
 
 
 
-class UserGenericListView(generics.ListAPIView):
-  # permission_classes = [IsAuthenticated,]
-  # queryset = User.objects.all()
-  # serializer_class = UserSerializer
-  # lookup_field= "id"
+class UserGenericListView(generics.ListCreateAPIView, generics.RetrieveDestroyAPIView):
+  permission_classes = (IsAuthenticated,)
+  lookup_field= "pk"
+  def get_queryset(self):    
+    return User.objects.all()
 
-  def list(self, request, *args, **kwargs):
-    if(self.request.user.is_superuser):
-      users = User.objects.all()
+  def get_serializer_class(self, *args, **kwargs):
+    return UserSerializer
 
-    elif self.request.user.is_authenticated:
-      users =  User.objects.get(id= self.request.user.id)
+  def get(self, request, *args, **kwargs):
+    queryset = self.get_queryset()
+    serializer =self.get_serializer(queryset, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+  
+  def create(self, request, *args, **kwargs):
+    serializer = self.get_serializer(data = request.data)
+    if serializer.is_valid():
+      serializer.save(make_password(serializer.validated_data['password']), is_active = False)
+    return Response (serializer.data, status=status.HTTP_201_CREATED)
+
     
-    serialiser = UserSerializer(users, many=True)
-    if serialiser.is_valid():
-      return Response(serialiser.data)
-    return Response(serialiser.errors)
-
+    
 
